@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG Study World</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Evita barras de desplazamiento */
+            background-color: #000;
+        }
+        canvas {
+            display: block; /* Elimina espacio extra debajo del canvas */
+        }
+    </style>
+</head>
+<body>
+    <!-- Importar Kaboom.js desde CDN -->
+    <script src="https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js"></script>
+
+    <script>
+        // Inicializar Kaboom
+        kaboom({
+            background: [0, 0, 0], // Fondo negro
+            width: window.innerWidth,
+            height: window.innerHeight,
+            scale: 1,
+            debug: true // Útil para desarrollo
+        });
+
+        // Escena principal
+        scene("main", () => {
+            add([
+                text("RPG Study World - Presiona Enter", {
+                    size: 24,
+                    width: width() - 40, // Ajuste para que no se salga en pantallas pequeñas
+                    align: "center"
+                }),
+                pos(center()), // Centra el objeto en la pantalla
+                anchor("center"), // Punto de anclaje en el centro del texto
+                color(255, 255, 255)
+            ]);
+
+            // Ejemplo de input
+            onKeyPress("enter", () => {
+                debug.log("¡Enter presionado! Listo para comenzar el juego.");
+                // Aquí iría la lógica para cambiar de escena o iniciar
+            });
+        });
+
+        // Iniciar el juego en la escena "main"
+        go("main");
+    </script>
+</body>
+</html>
