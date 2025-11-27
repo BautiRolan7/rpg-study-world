@@ -4,54 +4,138 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RPG Study World</title>
+    <script src="https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js"></script>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Evita barras de desplazamiento */
-            background-color: #000;
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
+        #ui-layer {
+            position: absolute; top: 20px; left: 20px; z-index: 100;
+            background: rgba(0, 0, 0, 0.8); padding: 20px; border: 2px solid white; color: white;
+            border-radius: 8px;
         }
-        canvas {
-            display: block; /* Elimina espacio extra debajo del canvas */
-        }
+        button { cursor: pointer; padding: 10px; background: #444; color: white; border: 1px solid white; }
+        button:hover { background: #666; }
+        #loading { display: none; color: yellow; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <!-- Importar Kaboom.js desde CDN -->
-    <script src="https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js"></script>
+
+    <div id="ui-layer">
+        <h2>📜 Sube tus apuntes (PDF)</h2>
+        <input type="file" id="pdfInput" accept="application/pdf">
+        <button onclick="uploadAndStart()">⚔️ Generar Mundo</button>
+        <div id="loading">Invoco a la IA... (Esto puede tardar unos segundos)</div>
+    </div>
 
     <script>
         // Inicializar Kaboom
         kaboom({
-            background: [0, 0, 0], // Fondo negro
-            width: window.innerWidth,
-            height: window.innerHeight,
-            scale: 1,
-            debug: true // Útil para desarrollo
+            background: [0, 0, 0], // Fondo negro inicial
         });
 
-        // Escena principal
-        scene("main", () => {
+        // Pantalla de bienvenida
+        add([
+            text("RPG STUDY WORLD\nSube un PDF para empezar", { size: 24 }),
+            pos(width()/2, height()/2),
+            anchor("center"),
+            color(255, 255, 255)
+        ]);
+
+        async function uploadAndStart() {
+            const fileInput = document.getElementById('pdfInput');
+            const file = fileInput.files[0];
+            if (!file) { alert("¡Selecciona un PDF primero!"); return; }
+
+            document.getElementById('loading').style.display = 'block';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // Enviar PDF al servidor (app.py)
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                // Si todo sale bien, iniciar el juego con los datos
+                document.getElementById('ui-layer').style.display = 'none'; // Ocultar menú
+                startGame(data);
+
+            } catch (error) {
+                console.error(error);
+                alert("Error al conectar con la IA. Revisa la consola.");
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function startGame(data) {
+            // Limpiar pantalla
+            destroyAll();
+
+            // Fondo verde (pasto)
             add([
-                text("RPG Study World - Presiona Enter", {
-                    size: 24,
-                    width: width() - 40, // Ajuste para que no se salga en pantallas pequeñas
-                    align: "center"
-                }),
-                pos(center()), // Centra el objeto en la pantalla
-                anchor("center"), // Punto de anclaje en el centro del texto
-                color(255, 255, 255)
+                rect(width(), height()),
+                color(50, 200, 50)
             ]);
 
-            // Ejemplo de input
-            onKeyPress("enter", () => {
-                debug.log("¡Enter presionado! Listo para comenzar el juego.");
-                // Aquí iría la lógica para cambiar de escena o iniciar
-            });
-        });
+            // Título del mundo
+            add([
+                text("Mundo: " + data.world_name, { size: 20 }),
+                pos(20, 20),
+                color(0, 0, 0)
+            ]);
 
-        // Iniciar el juego en la escena "main"
-        go("main");
+            // Jugador (Cuadrado Azul por ahora)
+            const player = add([
+                rect(32, 32),
+                pos(width()/2, height()/2),
+                color(0, 0, 255),
+                area(),
+                body(),
+                "player"
+            ]);
+
+            // Controles básicos
+            onKeyDown("left", () => player.move(-200, 0));
+            onKeyDown("right", () => player.move(200, 0));
+            onKeyDown("up", () => player.move(0, -200));
+            onKeyDown("down", () => player.move(0, 200));
+
+            // Crear Enemigos desde el JSON de la IA
+            data.enemies.forEach((enemy, index) => {
+                // Posición aleatoria
+                const x = rand(100, width() - 100);
+                const y = rand(100, height() - 100);
+
+                add([
+                    rect(40, 40), // Cuadrado Rojo (Enemigo)
+                    pos(x, y),
+                    color(255, 0, 0),
+                    area(),
+                    "enemy",
+                    { 
+                        name: enemy.name,
+                        questions: enemy.questions
+                    }
+                ]);
+                
+                // Nombre del enemigo encima
+                add([
+                    text(enemy.name, { size: 12 }),
+                    pos(x, y - 20),
+                    color(0, 0, 0)
+                ]);
+            });
+
+            // Colisión con enemigos
+            player.onCollide("enemy", (enemy) => {
+                destroy(enemy); // Desaparece al tocarlo (luego pondremos la batalla)
+                const q = enemy.questions[0]; // Tomar la primera pregunta
+                alert(`¡BATALLA!\n\n${q.q}\n\nA) ${q.options[0]}\nB) ${q.options[1]}\nC) ${q.options[2]}`);
+            });
+        }
     </script>
 </body>
 </html>
