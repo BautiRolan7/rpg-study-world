@@ -4,137 +4,229 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RPG Study World</title>
-    <script src="https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js"></script>
+    <script src="[https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js](https://unpkg.com/kaboom@3000.0.1/dist/kaboom.js)"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
-        #ui-layer {
-            position: absolute; top: 20px; left: 20px; z-index: 100;
-            background: rgba(0, 0, 0, 0.8); padding: 20px; border: 2px solid white; color: white;
-            border-radius: 8px;
+        /* Estilos CSS para que parezca una app real */
+        body { margin: 0; overflow: hidden; background: #202020; font-family: 'Verdana', sans-serif; }
+        
+        /* Menú de Carga */
+        #ui-menu {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            text-align: center; z-index: 100; width: 300px;
         }
-        button { cursor: pointer; padding: 10px; background: #444; color: white; border: 1px solid white; }
-        button:hover { background: #666; }
-        #loading { display: none; color: yellow; margin-top: 10px; }
+        
+        /* Interfaz de Batalla (Oculta al inicio) */
+        #battle-ui {
+            display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 600px; background: white; border: 4px solid #333; border-radius: 10px;
+            padding: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); font-size: 16px;
+        }
+        
+        .btn { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px;}
+        .btn:hover { background: #45a049; }
+        .option-btn { display: block; width: 100%; margin: 5px 0; padding: 10px; background: #f0f0f0; border: 1px solid #ccc; cursor: pointer; text-align: left;}
+        .option-btn:hover { background: #e0e0e0; }
+        
+        #loading { display: none; color: #666; margin-top: 10px; font-size: 0.9em; }
     </style>
 </head>
 <body>
 
-    <div id="ui-layer">
-        <h2>📜 Sube tus apuntes (PDF)</h2>
-        <input type="file" id="pdfInput" accept="application/pdf">
-        <button onclick="uploadAndStart()">⚔️ Generar Mundo</button>
-        <div id="loading">Invoco a la IA... (Esto puede tardar unos segundos)</div>
+    <div id="ui-menu">
+        <h1>🎓 RPG Study</h1>
+        <p>Sube tus apuntes para generar el mundo</p>
+        <input type="file" id="pdfInput" accept=".pdf, .docx, .txt" style="margin-bottom: 10px;">
+        <br>
+        <button class="btn" onclick="uploadAndStart()">Generar Mundo</button>
+        <div id="loading">✨ La IA está leyendo tu PDF...</div>
+    </div>
+
+    <div id="battle-ui">
+        <h3 id="question-text">¿Pregunta?</h3>
+        <div id="options-container"></div>
+        <p id="feedback" style="font-weight: bold; color: blue;"></p>
+        <button id="close-battle" class="btn" style="display:none;" onclick="closeBattle()">Continuar Explorando</button>
     </div>
 
     <script>
-        // Inicializar Kaboom
+        // 1. Configuración del Juego
         kaboom({
-            background: [0, 0, 0], // Fondo negro inicial
+            background: [80, 200, 80], // Verde pasto
+            scale: 1.5, // Zoom estilo retro
         });
 
-        // Pantalla de bienvenida
-        add([
-            text("RPG STUDY WORLD\nSube un PDF para empezar", { size: 24 }),
-            pos(width()/2, height()/2),
-            anchor("center"),
-            color(255, 255, 255)
-        ]);
+        // 2. Cargar Gráficos (Sprites)
+        // Usamos assets públicos para que funcione YA sin que tengas que dibujar
+        loadSprite("hero", "[https://kaboomjs.com/sprites/bean.png](https://kaboomjs.com/sprites/bean.png)"); // Tu personaje
+        loadSprite("slime", "[https://kaboomjs.com/sprites/bobo.png](https://kaboomjs.com/sprites/bobo.png)"); // Enemigo 1
+        loadSprite("ghost", "[https://kaboomjs.com/sprites/ghosty.png](https://kaboomjs.com/sprites/ghosty.png)"); // Enemigo 2
+        loadSprite("floor", "[https://kaboomjs.com/sprites/grass.png](https://kaboomjs.com/sprites/grass.png)"); // Suelo
 
+        // Variables globales
+        let currentEnemy = null;
+        let player = null;
+
+        // 3. Lógica de Subida y Conexión
         async function uploadAndStart() {
             const fileInput = document.getElementById('pdfInput');
-            const file = fileInput.files[0];
-            if (!file) { alert("¡Selecciona un PDF primero!"); return; }
+            if (!fileInput.files[0]) { alert("¡Falta el PDF!"); return; }
 
             document.getElementById('loading').style.display = 'block';
 
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', fileInput.files[0]);
 
             try {
-                // Enviar PDF al servidor (app.py)
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
                 
-                const data = await response.json();
+                if (data.error) { throw new Error(data.error); }
                 
-                // Si todo sale bien, iniciar el juego con los datos
-                document.getElementById('ui-layer').style.display = 'none'; // Ocultar menú
-                startGame(data);
+                document.getElementById('ui-menu').style.display = 'none';
+                initGame(data);
 
             } catch (error) {
-                console.error(error);
-                alert("Error al conectar con la IA. Revisa la consola.");
+                alert("Error: " + error.message);
                 document.getElementById('loading').style.display = 'none';
             }
         }
 
-        function startGame(data) {
-            // Limpiar pantalla
-            destroyAll();
+        // 4. Iniciar el Mundo del Juego
+        function initGame(data) {
+            // Fondo de baldosas
+            for(let x=0; x<width(); x+=64) {
+                for(let y=0; y<height(); y+=64) {
+                    add([sprite("floor"), pos(x,y), scale(2), z(-1)]); // z(-1) para que esté al fondo
+                }
+            }
 
-            // Fondo verde (pasto)
+            // Título
             add([
-                rect(width(), height()),
-                color(50, 200, 50)
-            ]);
-
-            // Título del mundo
-            add([
-                text("Mundo: " + data.world_name, { size: 20 }),
+                text(data.world_name, { size: 24 }),
                 pos(20, 20),
-                color(0, 0, 0)
+                fixed(),
+                color(0,0,0)
             ]);
 
-            // Jugador (Cuadrado Azul por ahora)
-            const player = add([
-                rect(32, 32),
-                pos(width()/2, height()/2),
-                color(0, 0, 255),
+            // Jugador
+            player = add([
+                sprite("hero"),
+                pos(center()),
                 area(),
                 body(),
+                scale(1.5),
+                anchor("center"),
                 "player"
             ]);
 
-            // Controles básicos
-            onKeyDown("left", () => player.move(-200, 0));
-            onKeyDown("right", () => player.move(200, 0));
-            onKeyDown("up", () => player.move(0, -200));
-            onKeyDown("down", () => player.move(0, 200));
+            // Cámara sigue al jugador
+            player.onUpdate(() => {
+                camPos(player.pos);
+            });
 
-            // Crear Enemigos desde el JSON de la IA
-            data.enemies.forEach((enemy, index) => {
-                // Posición aleatoria
-                const x = rand(100, width() - 100);
-                const y = rand(100, height() - 100);
+            // Controles
+            onKeyDown("left", () => player.move(-300, 0));
+            onKeyDown("right", () => player.move(300, 0));
+            onKeyDown("up", () => player.move(0, -300));
+            onKeyDown("down", () => player.move(0, 300));
 
-                add([
-                    rect(40, 40), // Cuadrado Rojo (Enemigo)
-                    pos(x, y),
-                    color(255, 0, 0),
+            // Crear Enemigos
+            data.enemies.forEach(enemyData => {
+                // Elegir sprite basado en lo que dijo la IA, o default 'slime'
+                let spriteName = ["slime", "ghost"].includes(enemyData.sprite_type) ? enemyData.sprite_type : "slime";
+
+                const enemy = add([
+                    sprite(spriteName),
+                    pos(rand(100, 1000), rand(100, 800)), // Posición aleatoria en un mapa grande
                     area(),
+                    body({ isStatic: true }), // Los enemigos no se empujan
+                    scale(1.5),
+                    anchor("center"),
                     "enemy",
                     { 
-                        name: enemy.name,
-                        questions: enemy.questions
+                        data: enemyData,
+                        defeated: false 
                     }
                 ]);
-                
-                // Nombre del enemigo encima
+
+                // Nombre del enemigo
                 add([
-                    text(enemy.name, { size: 12 }),
-                    pos(x, y - 20),
-                    color(0, 0, 0)
+                    text(enemyData.name, { size: 14 }),
+                    pos(enemy.pos.x, enemy.pos.y - 40),
+                    anchor("center"),
+                    color(0,0,0)
                 ]);
             });
 
-            // Colisión con enemigos
+            // Colisión = Batalla
             player.onCollide("enemy", (enemy) => {
-                destroy(enemy); // Desaparece al tocarlo (luego pondremos la batalla)
-                const q = enemy.questions[0]; // Tomar la primera pregunta
-                alert(`¡BATALLA!\n\n${q.q}\n\nA) ${q.options[0]}\nB) ${q.options[1]}\nC) ${q.options[2]}`);
+                if (!enemy.defeated) {
+                    startBattle(enemy);
+                }
             });
+        }
+
+        // 5. Sistema de Batalla (Interfaz HTML)
+        function startBattle(enemyObj) {
+            currentEnemy = enemyObj;
+            const ui = document.getElementById('battle-ui');
+            const qContainer = document.getElementById('options-container');
+            const feedback = document.getElementById('feedback');
+            
+            // Pausar juego (truco simple: quitar controles o velocidad)
+            // Por simplicidad, dejamos que el jugador se mueva pero mostramos el UI
+            
+            ui.style.display = 'block';
+            feedback.innerText = "";
+            document.getElementById('close-battle').style.display = 'none';
+
+            // Tomar una pregunta al azar
+            const questionData = enemyObj.data.questions[Math.floor(Math.random() * enemyObj.data.questions.length)];
+            
+            document.getElementById('question-text').innerText = "⚔️ " + questionData.q;
+            qContainer.innerHTML = ""; // Limpiar anteriores
+
+            // Mezclar opciones (para que la correcta no sea siempre la A)
+            // Creamos un array de objetos con texto y si es correcta
+            let options = questionData.options.map((opt, index) => ({ text: opt, isCorrect: index === 0 }));
+            options.sort(() => Math.random() - 0.5); // Barajar
+
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerText = opt.text;
+                btn.onclick = () => checkAnswer(opt.isCorrect, questionData.explanation, btn);
+                qContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(isCorrect, explanation, btnElement) {
+            const feedback = document.getElementById('feedback');
+            
+            if (isCorrect) {
+                feedback.innerText = "¡CORRECTO! 🎉 " + explanation;
+                feedback.style.color = "green";
+                btnElement.style.background = "#90EE90";
+                
+                // Marcar enemigo como vencido
+                currentEnemy.defeated = true;
+                currentEnemy.color = rgb(100, 100, 100); // Ponerlo gris
+                currentEnemy.opacity = 0.5;
+                
+                document.getElementById('close-battle').style.display = 'block';
+            } else {
+                feedback.innerText = "Incorrecto. Pierdes vida. Intenta otra vez.";
+                feedback.style.color = "red";
+                btnElement.style.background = "#FFB6C1";
+                // Aquí podrías restar vida al jugador
+            }
+        }
+
+        function closeBattle() {
+            document.getElementById('battle-ui').style.display = 'none';
+            // Empujar un poco al jugador para que no vuelva a chocar instantáneamente
+            player.pos.x += 20; 
         }
     </script>
 </body>

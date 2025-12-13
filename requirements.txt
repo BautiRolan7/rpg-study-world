@@ -1,4 +1,6 @@
 flask
 google-generativeai
 python-dotenv
-pypdf2
+PyPDF2
+pycryptodome
+python-docx
